@@ -1,0 +1,50 @@
+set echo off
+set messages off
+
+alpha = 0.36
+beta = 0.99	
+delta = 0.025
+A = 3 
+
+
+function matrix ckhySS(scalar alpha, scalar beta,scalar delta, scalar A)
+    r = zeros(1,4)
+    ratioyk = (1/beta-1+delta)/alpha
+	ratioyc = 1/(1-delta*1/ratioyk)
+	r[3] = ratioyc*(1-alpha)/A
+	r[2] = ((1/beta-1+delta)/(alpha*r[3]^(1-alpha)))^(1/(alpha-1))
+	r[1] = ratioyk/ratioyc*r[2]
+	r[4] = r[2]^alpha*r[3]^(1-alpha)
+    return r
+end function 
+
+function matrix ckhgrid(scalar alpha, scalar beta, scalar delta,scalar A)
+	r = zeros(0,4)
+	gc = seq(0.1,1,0.01)
+	gk = seq(10.5,11,0.01)
+	gh = seq(0.1,1,0.01)
+	res = {0,cols(gc),cols(gk),cols(gh)}
+	loop ic = 1..cols(gc)
+		loop ik = 1..cols(gk)
+			loop ih = 1..cols(gh)
+				 c1=gc[ic]-(1-alpha)/A+gk[ik]^(alpha)+gh[ih]^(-alpha)
+				c2 = 1/beta-1+delta-alpha*gk[ik]^(alpha-1)*gh[ih]^(-alpha)
+				c3 = delta*gk[ik]-gk[ik]^(alpha)*gk[ih]^(1-alpha)+gc[ic]
+				res[ic,ik,ih] = sqrt(c1^2+c2^2+c3^2) #prob
+			endloop
+		endloop
+	endloop
+	minim = which(res=min(res))
+	r[1] = gc[min[1]]
+	r[2] = gk[min[2]]
+	r[3] = gh[min[3]]
+	r[4] = r[2]^(alpha)*r[3]^(1-alpha)
+    return r 
+end function 
+
+c_t = ckhgrid(alpha,beta,delta,A)
+c = ckhySS(alpha,beta,delta,A)[1]
+k = ckhySS(alpha,beta,delta,A)[2]
+h = ckhySS(alpha,beta,delta,A)[3]
+y = ckhySS(alpha,beta,delta,A)[4] # derive steady-state values
+
