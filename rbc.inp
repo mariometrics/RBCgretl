@@ -3,7 +3,7 @@ set messages off
 
 ##  Mario Marchetti 22-02-2020
 ##  Basic RBC model ##
-##  Transposition in hansl language from the code written in Matlab Language
+##  Adapted in hansl language from the code written in Matlab Language
 ##  by Ryo Kato in 2004
 
 
