@@ -1,0 +1,192 @@
+set echo off
+set messages off
+
+##  Basic RBC model ##
+##  Transposition in hansl language from the code written in Matlab Language
+##  by Ryo Kato in 2004
+##  Labor disutility ==>   -myu*(lt^(1+lamda))/(1+lamda)
+
+
+## ------------------- [1] Parameter proc  ------------------------
+sigma = 1.5   # CRRA
+alpha = 0.3   # Cobb-Dag
+myu = 1		# labor-consumption supply
+beta = 0.99 # discount factor
+delta = 0.025 #depreciation 
+lamda = 2   # labor supply elasticity >1
+phi = 0.8     # AR(1) in tech
+param = {sigma,alpha,myu,beta,delta,lamda,phi}
+
+## --------------------- [2] Steady State proc >> -----------------------
+# SS capital & ss labor
+# (1) real rate  (By SS euler)
+kls = (((1/beta)+delta-1)/alpha)^(1/(alpha-1))
+# (2) wage
+wstar = (1-alpha)*(kls)^alpha
+# (3) Labor and goods market clear
+clstar = kls^alpha - delta*kls
+lstar = ((wstar/myu)*(clstar^(-sigma)))^(1/(lamda+sigma))
+kstar = kls*lstar
+cstar = clstar*lstar
+vstar = 1
+Ystar = (kstar^alpha)*(lstar^(1-alpha))
+
+ssCKoLY = {cstar,kstar;lstar,Ystar}  # show SS values
+
+## --------------------------[2] MODEL proc-----------------------------##
+# Define endogenous vars  ('a' denotes t+1 values)
+function matrix RBC(matrix *param,matrix *x)
+    sigma = param[1]
+    alpha = param[2]
+    myu = param[3]
+    beta = param[4]
+    delta = param[5]
+    lamda = param[6]
+    phi = param[7]
+
+    la = x[1]
+    ca = x[2]
+    ka = x[3]
+    va = x[4]
+    lt = x[5]
+    ct = x[6]
+    kt = x[7]
+    vt = x[8]
+    ra = 0
+    rt = 0
+    # Eliminate Price
+    ra = (va*alpha*(ka/la)^(alpha-1))
+    wt = (1-alpha)*vt*(kt/lt)^alpha
+    # Optimal Conditions  & state transition
+    labor   = lt^lamda-wt/(myu*ct^sigma)        						# LS = LD
+    euler   = ct^(-sigma) -(ca^(-sigma))*beta*(1+ra-delta) 	      	# C-Euler
+    capital = ka - (1-delta)*kt-vt*(kt^alpha)*(lt^(1-alpha))+ct  	# K-trans
+    tech    = va - phi*vt
+
+    matrix optcon  = {labor;euler;capital;tech}
+    return optcon
+end function
+
+function scalar RBCY(matrix *param,matrix *xr)
+    # GDP (Optional)
+    alpha = param[2]
+    vt = xr[3]
+    kt = xr[2]
+    lt = xr[1]
+    Yt  = vt*(kt^alpha)*(lt^(1-alpha))
+    return Yt
+end function
+
+# Evaluate each derivate
+matrix x = {lstar,cstar,kstar,vstar,lstar,cstar,kstar,vstar}
+matrix xr = {lstar,kstar,vstar}
+# Numerical jacobian
+matrix coeff = fdjac(x,RBC(&param,&x))
+matrix coeffy = fdjac(xr,RBCY(&param,&xr))
+
+# In terms of # deviations from ss
+matrix vo = {lstar,cstar,kstar,vstar}
+matrix TW = vo | vo | vo | vo
+matrix B = -coeff[,1:4].*TW
+matrix C = coeff[,5:8].*TW
+# B[c(t+1)  l(t+1)  k(t+1)  z(t+1)] = C[c(t)  l(t)  k(t)  z(t)]
+matrix A = inv(C)*B  #(Linearized reduced form )
+
+# For GDP( optional)
+matrix ve  = {lstar,kstar,vstar}
+matrix NOM = {Ystar,Ystar,Ystar}
+matrix PPX = coeffy.*ve./NOM
+
+## =========== [4] Solution proc (Do NOT touch!!) ============== ##
+#  EIGEN DECOMPOSITION
+matrix W = {}
+matrix theta = eigengen(A, &W)
+Q = inv(W)
+V = zeros(4,4)
+V[diag] = theta
+LL = W*V*Q # not find a role yet...
+
+# Extract stable vectors
+matrix SQ =  {}
+loop j = 1..rows(theta) --quiet
+    if abs(theta[j]) > 1.000000001
+        SQ |= Q[j,]
+    endif
+endloop
+
+# Extract unstable vectors
+matrix UQ = {}
+loop jj = 1..rows(theta) --quiet
+    if abs(theta[jj])<0.9999999999
+        UQ |= Q[jj,]
+    endif
+endloop
+
+# Extract stable roots
+matrix VLL = {}
+loop jjj = 1..rows(theta) --quiet 
+    if abs(theta[jjj]) >1.0000000001
+        VLL |= theta[jjj,]
+    endif
+endloop
+
+
+
+
+# [3] ELIMINATING UNSTABLE VECTORS
+k = min({rows(SQ),cols(SQ)})   # # of predetermined vars
+n = min({rows(UQ),cols(UQ)})   # # of jump vars
+nk = {n,k}
+# Stable V (eig mat)
+diago = zeros(rows(VLL),rows(VLL))
+diago[diag] = VLL
+VL = inv(diago)
+
+# Elements in Q
+PA = UQ[1:n,1:n]    
+PB = UQ[1:n,n+1:n+k]
+PC = SQ[1:k,1:n]    
+PD = SQ[1:k,n+1:n+k]
+P = -inv(PA)*PB  # X(t) = P*S(t)
+PE = PC*P+PD 
+
+# SOLUTION
+PX = inv(PE)*VL*PE
+AA = Re(PX)
+
+## ------------------ [5]  SIMULATION proc  ----------------- ##
+# [4] TIME&INITIAL VALUES
+
+t = 48			# Time span
+
+# Initial Values
+# state var + e
+S1 = {0;0.06}
+
+# [5] SIMULATION
+Ss = S1
+S = zeros(t,k)
+loop i = 1..t --quiet
+    q = AA*Ss
+    S[i,] = q'
+    Ss = S[i,]'
+endloop
+SY = S1' | S
+X = (Re(P)*SY')'
+
+# Re-definition
+ci = X[,1]
+li = X[,2]
+ki = SY[,1]
+vi = SY[,2]
+
+matrix XI = li~ki~vi
+Yi = (PPX*XI')'
+     
+# [6] DRAWING FIGURES
+gnuplot --matrix=Yi --time-series --with-lines --output=display { set linetype 3 lc rgb "#0000ff"; set title "Y"; set key rmargin; set xlabel "time"; set ylabel "IRF Y_t"; }     
+# put columns together and add labels  
+plotmat = X ~ SY
+strings cnames = defarray("C", "L","K","V")
+cnameset(plotmat, cnames)
+scatters 1 2 3 4 --matrix=plotmat --with-lines --output=display 
