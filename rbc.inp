@@ -4,7 +4,6 @@ set messages off
 ##  Basic RBC model ##
 ##  Transposition in hansl language from the code written in Matlab Language
 ##  by Ryo Kato in 2004
-##  Labor disutility ==>   -myu*(lt^(1+lamda))/(1+lamda)
 
 
 ## ------------------- [1] Parameter proc  ------------------------
