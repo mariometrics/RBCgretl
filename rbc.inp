@@ -172,7 +172,7 @@ loop i = 1..t --quiet
     Ss = S[i,]'
 endloop
 SY = S1' | S
-X = (Re(P)*SY')'
+X = (Re(P)*SY')' #IRF
 
 # Re-definition
 ci = X[,1]
