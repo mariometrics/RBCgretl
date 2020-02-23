@@ -97,7 +97,7 @@ matrix ve  = {lstar,kstar,vstar}
 matrix NOM = {Ystar,Ystar,Ystar}
 matrix PPX = coeffy.*ve./NOM
 
-## =========== [4] Solution proc (Do NOT touch!!) ============== ##
+## =========== [4] Solution proc ============== ##
 #  EIGEN DECOMPOSITION
 matrix W = {}
 matrix theta = eigengen(A, &W)
