@@ -35,9 +35,9 @@ function matrix ckhgrid(scalar alpha, scalar beta, scalar delta,scalar A)
 		endloop
 	endloop
 	minim = which(res=min(res))
-	r[1] = gc[min[1]]
-	r[2] = gk[min[2]]
-	r[3] = gh[min[3]]
+	r[1] = gc[minim[1]]
+	r[2] = gk[minim[2]]
+	r[3] = gh[minim[3]]
 	r[4] = r[2]^(alpha)*r[3]^(1-alpha)
     return r 
 end function 
